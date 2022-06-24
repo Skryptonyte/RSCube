@@ -5,6 +5,8 @@ use std::io::prelude::*;
 use std::io::BufReader;
 use std::cmp;
 
+use std::sync::mpsc::channel;
+use std::sync::mpsc;
 use std::io::prelude::*;
 use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
@@ -23,54 +25,138 @@ mod client;
 mod server;
 use crate::client::Client;
 use crate::server::Server;
+
+use std::collections::HashMap;
 // Client packets
 
-fn handle_client(mut stream: TcpStream, player_id: i8, mut rw_lock: Arc<Mutex<Server>>)
+fn handle_client(mut stream: TcpStream, player_id: i8, tx: mpsc::Sender<(i8,u8, Vec<u8>)>)
 {
-    println!("Connected");
-    
-    let mut client = Client::new(player_id,stream);
+
+
+    println!("Player ID {} connected!",player_id);
+    //{
+    //let mut server = rw_lock.lock().unwrap();
+    //server.clients.insert(player_id, client);
+    //}
+
+    //let mut client = Client::new(player_id);
 
     loop
     {
-        let mut s = rw_lock.lock().unwrap();
 
         let mut packetID: [u8; 1] = [0; 1];
-        client.stream.read_exact(&mut packetID).unwrap();
+
+        stream.read_exact(&mut packetID).unwrap();
+
 
         match packetID[0]
         {
             0 => {
-                client_packets::client_identification_packet(&mut client);
+                let mut packet_data: [u8; 130] = [0;130];
+                stream.read_exact(&mut packet_data).unwrap();
+                tx.send((player_id, packetID[0], packet_data.to_vec())).unwrap();
+
+                //client_packets::client_identification_packet(&mut s, player_id);
             },
             5 => {
-                client_packets::client_set_block_packet(&mut client);
+                let mut packet_data: [u8;  8] = [0;8];
+                stream.read_exact(&mut packet_data).unwrap();
+                tx.send((player_id, packetID[0], packet_data.to_vec())).unwrap();
+
+                //client_packets::client_set_block_packet(&mut s, player_id);
             },
             8 =>{
-                client_packets::client_position_packet(&mut client);
-            }
+                let mut packet_data: [u8; 9] = [0;9];
+                stream.read_exact(&mut packet_data).unwrap();
+                tx.send((player_id, packetID[0], packet_data.to_vec())).unwrap();
+
+                //client_packets::client_position_packet(&mut s, player_id);
+            },
             13 =>{
-                client_packets::client_chat_packet(&mut client);
+                let mut packet_data: [u8; 65] = [0;65];
+                stream.read_exact(&mut packet_data).unwrap();
+                tx.send((player_id, packetID[0], packet_data.to_vec())).unwrap();
+
+                //client_packets::client_chat_packet(&mut s, player_id);
             }
             _ =>   {println!("Invalid packet ID {} recieved! Terminating", packetID[0]);
             return;}
         }
 
+
     }
 }
 
+
+fn consumer_thread(rx: mpsc::Receiver<(i8,u8,Vec<u8>)>, server: Arc<Mutex<Server>>)
+{
+    for recieved in rx
+    {
+        println!("Player {} sent Packet ID: {}", recieved.0, recieved.1);
+
+        let packet_id: u8 = recieved.1;
+        let player_id: i8 = recieved.0;
+        let packet_data = recieved.2;
+        let mut cur = Cursor::new(&packet_data);
+        match packet_id
+        {
+            0 => {
+                let mut s = server.lock().unwrap();
+                client_packets::client_identification_packet(&mut s, &mut cur,player_id);
+            },
+
+            5 =>
+            {
+
+            },
+            8 =>
+            {
+                let mut s = server.lock().unwrap();
+                client_packets::client_position_packet(&mut s, &mut cur,player_id);
+            },
+            13 => 
+            {
+                let mut s = server.lock().unwrap();
+                client_packets::client_chat_packet(&mut s, &mut cur, player_id);
+            },
+            _ =>
+            {
+                println!("Unrecognized packet ID recieved");
+            }
+            
+        }
+    }
+}
 fn main()
 {
     let listener = TcpListener::bind("0.0.0.0:25565").unwrap();
     let server_rw = Arc::new(Mutex::new(Server::new("RSCube Server", "Lol")));
     
-    let i: i8 = 0;
+    let mut i: i8 = 0;
+
+    let (tx, rx) = channel();
+
+    let rw_lock_clone = Arc::clone(&server_rw);
+    let client_add_lock = Arc::clone(&server_rw);
+
+    thread::spawn(move || {
+        consumer_thread(rx,rw_lock_clone);
+    });
+
     for stream in listener.incoming()
     {
-        let rw_lock_clone = Arc::clone(&server_rw);
+        let mut s = client_add_lock.lock().unwrap();
+
+        i = i+1;
+        let new_tx = tx.clone();
+        let write_stream = stream.unwrap();
+        let read_stream = write_stream.try_clone().unwrap();
+
+        let newClient = Client::new(i, write_stream);
+        s.clients.insert(i, newClient);
 
         thread::spawn(move || {
-            handle_client(stream.unwrap(), i,rw_lock_clone);
+            handle_client(read_stream, i,new_tx);
         });
     }
 }
