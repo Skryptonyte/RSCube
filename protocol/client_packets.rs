@@ -15,32 +15,54 @@ use crate::server::Server;
 
 use std::sync::Mutex;
 use std::sync::Arc;
-pub fn client_identification_packet(client: &mut Client)
+use std::io::Cursor;
+
+
+pub fn client_identification_packet(server: &mut Server, cur: &mut Cursor<&Vec<u8>>, client_id: i8)
 {
     println!("Client packet recieved");
 
-    let protocol: u8 = client.stream.read_u8().unwrap();
+    let world_coords: (u16, u16, u16, u16, u16, u16);
+    let mut player_name: [u8; 64] = [0x0; 64];
+    let mut verification_key: [u8; 64] = [0x0; 64];
+
+    {
+    let client = &mut server.clients.get_mut(&client_id).unwrap();
+
+    let protocol: u8 = cur.read_u8().unwrap();
 
     let mut player_name: [u8; 64] = [0x0; 64];
     let mut verification_key: [u8; 64] = [0x0; 64];
 
-    client.stream.read_exact(&mut player_name).unwrap();
-    client.stream.read_exact(&mut verification_key).unwrap();
+    cur.read_exact(&mut player_name).unwrap();
+    cur.read_exact(&mut verification_key).unwrap();
 
-    let unused: u8 = client.stream.read_u8().unwrap();
+    let unused: u8 = cur.read_u8().unwrap();
     println!("Parsing packet");
 
     client.player_name = String::from_utf8_lossy(&player_name).trim().to_string();
     server_identification_packet(client,"&4 RSCube &4","This is an MC Classic server written in Rust");
     println!("Server identification delivered!");
     level_init(client);
-    let world_coords = level_load(client);
-
+    world_coords = level_load(client);
+    
     level_finalize(client,world_coords.0, world_coords.1, world_coords.2);
     spawn_player(client,-1,"",world_coords.3 << 5, world_coords.4 << 5,world_coords.5 << 5);
+
+    }
+    let client_table = & server.clients;
+    let main_client = & server.clients.get(&client_id).unwrap();
+    for (player_id, other_client) in client_table
+    {
+        if (*player_id != client_id)
+        {
+        spawn_player(other_client,client_id,&main_client.player_name,world_coords.3 << 5, world_coords.4 << 5,world_coords.5 << 5);
+        spawn_player(main_client, *player_id, &other_client.player_name, world_coords.3 << 5, world_coords.4 << 5,world_coords.5 << 5);
+        }
+    }
 }
 
-pub fn client_position_packet(client: &mut Client)
+pub fn client_position_packet(server: &mut Server, cur: &mut Cursor<&Vec<u8>>,client_id: i8)
 {
 
     let player_id: i8;
@@ -51,43 +73,49 @@ pub fn client_position_packet(client: &mut Client)
     let yaw: u8;
     let pitch: u8;
     
-    {
-    player_id = client.stream.read_i8().unwrap();
-    x=client.stream.read_u16::<BigEndian>().unwrap();
-    y=client.stream.read_u16::<BigEndian>().unwrap();
-    z=client.stream.read_u16::<BigEndian>().unwrap();
+    let client = &mut server.clients.get_mut(&client_id).unwrap();
 
-    yaw=client.stream.read_u8().unwrap();
-    pitch=client.stream.read_u8().unwrap();
+    {
+    player_id = cur.read_i8().unwrap();
+    x=cur.read_u16::<BigEndian>().unwrap();
+    y=cur.read_u16::<BigEndian>().unwrap();
+    z=cur.read_u16::<BigEndian>().unwrap();
+
+    yaw=cur.read_u8().unwrap();
+    pitch=cur.read_u8().unwrap();
     }
 
+    server_position_packet_broadcast(server, client_id,x,y,z,yaw,pitch);
     //println!("Position: [ X: {}, Y: {}, Z: {} ]",X>>5,Y>>5,Z>>5);
 }
 
-pub fn client_set_block_packet(client: &mut Client)
+pub fn client_set_block_packet(server: &mut Server, cur:&mut Cursor<Vec<u8>>, client_id: i8)
 {
-    let x: u16 = client.stream.read_u16::<BigEndian>().unwrap();
-    let y: u16 = client.stream.read_u16::<BigEndian>().unwrap();
-    let z: u16 = client.stream.read_u16::<BigEndian>().unwrap();
+    let client = &mut server.clients.get_mut(&client_id).unwrap();
 
-    let mode: u8 = client.stream.read_u8().unwrap();
-    let block_id: u8 = client.stream.read_u8().unwrap();
+    let x: u16 = cur.read_u16::<BigEndian>().unwrap();
+    let y: u16 = cur.read_u16::<BigEndian>().unwrap();
+    let z: u16 = cur.read_u16::<BigEndian>().unwrap();
+
+    let mode: u8 = cur.read_u8().unwrap();
+    let block_id: u8 = cur.read_u8().unwrap();
 
     println!("Set block for block ID: {} at position {} {} {} with mode: {}",block_id,x,y,z,mode);
 }
 
-pub fn client_chat_packet(client: &mut Client)
+pub fn client_chat_packet(server: &mut Server,cur: &mut Cursor<&Vec<u8>>,client_id: i8)
 {
-    let unused: u8 = client.stream.read_u8().unwrap();
+    let client = &mut server.clients.get_mut(&client_id).unwrap();
+
+    let unused: u8 = cur.read_u8().unwrap();
 
     let mut string_buffer: [u8; 64] = [0; 64];
-
-    client.stream.read_exact(&mut string_buffer);
+    cur.read_exact(&mut string_buffer);
 
     let chat_message = String::from_utf8_lossy(&string_buffer);
     println!("[CHAT] {}: {}",client.player_name,chat_message);
 
     let s: String = format!("{}: {}",client.player_name, chat_message);
 
-    server_chat_packet(client, &s);
+    server_chat_packet_broadcast(server, &s);
 }

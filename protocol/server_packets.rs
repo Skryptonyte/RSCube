@@ -18,6 +18,8 @@ use crate::client::Client;
 use std::io::BufReader;
 use std::io::BufWriter;
 
+use crate::server::Server;
+
 pub fn server_identification_packet(client: &mut Client, server_name: &str, motd: &str)
 {
     let mut packet: [u8; 131] = [0;131];
@@ -127,7 +129,7 @@ pub fn level_finalize(client: &mut Client, world_x: u16, world_y:u16, world_z:u1
     client.stream.write(&packet).unwrap();
 }
 
-pub fn spawn_player(client: &mut Client, player_id: i8,player_name: &str, spawn_x: u16, spawn_y: u16, spawn_z: u16)
+pub fn spawn_player(client: & Client, player_id: i8,player_name: &str, spawn_x: u16, spawn_y: u16, spawn_z: u16)
 {
     println!("Sending spawn player");
     let mut packet: Vec<u8> = Vec::new();
@@ -152,11 +154,12 @@ pub fn spawn_player(client: &mut Client, player_id: i8,player_name: &str, spawn_
     packet.write_u8(0x0).unwrap();
 
 
-    client.stream.write(&packet).unwrap();
+    let mut stream = &client.stream;
+    stream.write(&packet).unwrap();
 
 }
 
-pub fn server_chat_packet(client: &mut Client, message: &str)
+pub fn server_chat_packet_broadcast(server: &mut Server ,message: &str)
 {
     let mut packet: Vec<u8> = Vec::new();
 
@@ -168,5 +171,33 @@ pub fn server_chat_packet(client: &mut Client, message: &str)
     {
         packet.push(message.as_bytes()[i]);
     }
-    client.stream.write(&packet).unwrap();
+
+    for (player_id, client) in &mut server.clients
+    {
+        client.stream.write(&packet).unwrap();
+    }
+}
+
+pub fn server_position_packet_broadcast(server: &mut Server, calling_player_id: i8, x: u16, y: u16, z: u16, yaw: u8, pitch: u8)
+{
+    let mut packet: Vec<u8> = Vec::new();
+
+    packet.write_u8(0x8);
+    packet.write_i8(calling_player_id);
+
+    packet.write_u16::<BigEndian>(x).unwrap();
+    packet.write_u16::<BigEndian>(y).unwrap();
+    packet.write_u16::<BigEndian>(z).unwrap();
+
+    packet.write_u8(yaw);
+    packet.write_u8(pitch);
+
+
+    for (player_id, client) in &mut server.clients
+    {
+        if (*player_id != calling_player_id)
+        {
+            client.stream.write(&packet).unwrap();
+        }
+    }
 }
