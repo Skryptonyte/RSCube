@@ -48,8 +48,11 @@ pub fn level_init(client: &mut Client)
     client.stream.write(&packet).unwrap();
 }
 
-pub fn level_load(client: &mut Client) -> (u16, u16, u16, u16, u16, u16)
+pub fn level_load(server: &mut Server, client_id: i8) -> (u16, u16, u16, u16, u16, u16)
 {
+    let tuple: (u16, u16, u16, u16, u16, u16);
+
+    /*
     let mut file = File::open("world.lvl").unwrap();
 
     let mut header: [u8; 18] = [0; 18];
@@ -74,19 +77,28 @@ pub fn level_load(client: &mut Client) -> (u16, u16, u16, u16, u16, u16)
     println!("World Size: {} x {} x {}", world_X, world_Y, world_Z);
 
 
-    let mut cur2 = Cursor::new(&data);
-    let world_size:u32 = (u32::from(world_X) * u32::from(world_Y) * u32::from(world_Z)).into();
-
-    data.write_u32::<BigEndian>(world_size).unwrap();
     d.read_to_end(&mut data).unwrap();
+    */
 
+    let (world_X, world_Y, world_Z, spawn_X, spawn_Y, spawn_Z) = (server.world_x, server.world_y, server.world_z, server.spawn_x, server.spawn_y, server.spawn_z);
     let mut gzipped_map: Vec<u8> = Vec::new();
+
+    let mut data: Vec<u8> = Vec::new();
+
+
+    let world_size:u32 = (u32::from(world_X) * u32::from(world_Y) * u32::from(world_Z)).into();
+    data.write_u32::<BigEndian>(world_size).unwrap();
+    data.write(& server.world_data);
+
+
     {
     let mut e = GzEncoder::new(&mut gzipped_map, Compression::default());
     e.write(&data).unwrap();
     }
     println!("World data size: {}", data.len());
     println!("Gzipped data size: {}", gzipped_map.len());
+
+    let client = & server.clients.get(&client_id).unwrap();
 
     let mut i: usize = 0;
     while usize::from(i) < gzipped_map.len()
@@ -110,7 +122,8 @@ pub fn level_load(client: &mut Client) -> (u16, u16, u16, u16, u16, u16)
         packet.write_u8(0x0).unwrap();
 
         println!("Sending level chunk [Offset: {}, Size: {}]",i,chunk_length);
-        client.stream.write(&packet).unwrap();
+        let mut stream = & client.stream;
+        stream.write(&packet).unwrap();
 
         i += 1024;
     }
@@ -159,6 +172,20 @@ pub fn spawn_player(client: & Client, player_id: i8,player_name: &str, spawn_x: 
 
 }
 
+
+pub fn despawn_player_broadcast(server: & Server, player_id: i8)
+{
+    let mut packet: Vec<u8> = Vec::new();
+
+    packet.write_u8(0xc);
+    packet.write_i8(player_id);
+
+    for (c_id, client) in & server.clients
+    {
+        let mut stream = &client.stream;
+        stream.write(&packet);
+    }
+}
 pub fn server_chat_packet_broadcast(server: &mut Server ,message: &str)
 {
     let mut packet: Vec<u8> = Vec::new();
@@ -172,25 +199,58 @@ pub fn server_chat_packet_broadcast(server: &mut Server ,message: &str)
         packet.push(message.as_bytes()[i]);
     }
 
+    for i in cmp::min(64,message.len())..64
+    {
+        packet.push(0x20);
+    }
+
     for (player_id, client) in &mut server.clients
     {
         client.stream.write(&packet).unwrap();
     }
 }
 
-pub fn server_position_packet_broadcast(server: &mut Server, calling_player_id: i8, x: u16, y: u16, z: u16, yaw: u8, pitch: u8)
+pub fn server_set_block_packet_broadcast(server: &mut Server, x: u16, y: u16, z: u16, block_id: u8)
 {
     let mut packet: Vec<u8> = Vec::new();
 
-    packet.write_u8(0x8);
-    packet.write_i8(calling_player_id);
+    packet.write_u8(0x6).unwrap();
 
     packet.write_u16::<BigEndian>(x).unwrap();
     packet.write_u16::<BigEndian>(y).unwrap();
     packet.write_u16::<BigEndian>(z).unwrap();
 
-    packet.write_u8(yaw);
-    packet.write_u8(pitch);
+    packet.write_u8(block_id).unwrap();
+
+    let world_x = server.world_x;
+    let world_y = server.world_y;
+    let world_z = server.world_z;
+    {
+        let world_data = &mut server.world_data;
+        let calculated_index: u32 = u32::from(x) + u32::from(world_x) * ( u32::from(z) + u32::from( world_z ) * u32::from(y)) ;
+        let calculated_usize: usize = calculated_index.try_into().unwrap();
+        world_data[calculated_usize] = block_id;
+    }
+    for (player_id, client) in & server.clients
+    {
+        println!("Block change sent with block_id: {}", block_id);
+        let mut stream = & client.stream;   
+        stream.write(& packet).unwrap();
+    }
+}
+pub fn server_position_packet_broadcast(server: &mut Server, calling_player_id: i8, x: u16, y: u16, z: u16, yaw: u8, pitch: u8)
+{
+    let mut packet: Vec<u8> = Vec::new();
+
+    packet.write_u8(0x8).unwrap();
+    packet.write_i8(calling_player_id).unwrap();
+
+    packet.write_u16::<BigEndian>(x).unwrap();
+    packet.write_u16::<BigEndian>(y).unwrap();
+    packet.write_u16::<BigEndian>(z).unwrap();
+
+    packet.write_u8(yaw).unwrap();
+    packet.write_u8(pitch).unwrap();
 
 
     for (player_id, client) in &mut server.clients

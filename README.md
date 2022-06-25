@@ -1,10 +1,10 @@
 # RSCube
 
-A Minecraft Classic Server written in Rust
-
+A Minecraft Classic Server written in Rust. It is a multi-threaded server built on an MPSC architectuure.
 # TODO
 
-* Handle disconnects properly
-* Set block packets and world states
+* World Save to Disk
+* Level generator
+* Commands
 * CPE Support
 

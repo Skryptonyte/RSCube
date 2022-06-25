@@ -29,6 +29,62 @@ use crate::server::Server;
 use std::collections::HashMap;
 // Client packets
 
+
+fn recieve_packets(mut stream: &mut TcpStream, player_id: i8, tx: & mpsc::Sender<(i8,u8, Vec<u8>)>) -> Result<(),std::io::Error>
+{
+    loop
+    {
+
+        let mut packetID: [u8; 1] = [0; 1];
+
+        stream.read_exact(&mut packetID)?;
+
+        match packetID[0]
+        {
+            255 =>
+            {
+
+            }
+            0 => {
+                let mut packet_data: [u8; 130] = [0;130];
+                stream.read_exact(&mut packet_data)?;
+                tx.send((player_id, packetID[0], packet_data.to_vec())).unwrap();
+
+                //client_packets::client_identification_packet(&mut s, player_id);
+            },
+            5 => {
+                let mut packet_data: [u8;  8] = [0;8];
+                stream.read_exact(&mut packet_data)?;
+                tx.send((player_id, packetID[0], packet_data.to_vec())).unwrap();
+
+                //client_packets::client_set_block_packet(&mut s, player_id);
+            },
+            8 =>{
+                let mut packet_data: [u8; 9] = [0;9];
+                stream.read_exact(&mut packet_data)?;
+                tx.send((player_id, packetID[0], packet_data.to_vec())).unwrap();
+
+                //client_packets::client_position_packet(&mut s, player_id);
+            },
+            13 =>{
+                let mut packet_data: [u8; 65] = [0;65];
+                stream.read_exact(&mut packet_data)?;
+                tx.send((player_id, packetID[0], packet_data.to_vec())).unwrap();
+
+                //client_packets::client_chat_packet(&mut s, player_id);
+            },
+            _ =>   {
+                println!("Invalid packet ID {} recieved! Terminating", packetID[0]);
+                break;
+            }
+            
+        }
+
+
+    }
+
+    Ok(())
+}
 fn handle_client(mut stream: TcpStream, player_id: i8, tx: mpsc::Sender<(i8,u8, Vec<u8>)>)
 {
 
@@ -40,51 +96,19 @@ fn handle_client(mut stream: TcpStream, player_id: i8, tx: mpsc::Sender<(i8,u8, 
     //}
 
     //let mut client = Client::new(player_id);
-
-    loop
+    match recieve_packets(&mut stream, player_id, & tx)
     {
-
-        let mut packetID: [u8; 1] = [0; 1];
-
-        stream.read_exact(&mut packetID).unwrap();
-
-
-        match packetID[0]
+        Ok(()) => 
         {
-            0 => {
-                let mut packet_data: [u8; 130] = [0;130];
-                stream.read_exact(&mut packet_data).unwrap();
-                tx.send((player_id, packetID[0], packet_data.to_vec())).unwrap();
-
-                //client_packets::client_identification_packet(&mut s, player_id);
-            },
-            5 => {
-                let mut packet_data: [u8;  8] = [0;8];
-                stream.read_exact(&mut packet_data).unwrap();
-                tx.send((player_id, packetID[0], packet_data.to_vec())).unwrap();
-
-                //client_packets::client_set_block_packet(&mut s, player_id);
-            },
-            8 =>{
-                let mut packet_data: [u8; 9] = [0;9];
-                stream.read_exact(&mut packet_data).unwrap();
-                tx.send((player_id, packetID[0], packet_data.to_vec())).unwrap();
-
-                //client_packets::client_position_packet(&mut s, player_id);
-            },
-            13 =>{
-                let mut packet_data: [u8; 65] = [0;65];
-                stream.read_exact(&mut packet_data).unwrap();
-                tx.send((player_id, packetID[0], packet_data.to_vec())).unwrap();
-
-                //client_packets::client_chat_packet(&mut s, player_id);
-            }
-            _ =>   {println!("Invalid packet ID {} recieved! Terminating", packetID[0]);
-            return;}
+        println!("Client thread terminated cleanly!");
         }
-
-
+        Err(e) => 
+        {
+        println!("Connection Closed! Terminating Thread!");
+        tx.send((player_id,255,Vec::new()));
+        }
     }
+
 }
 
 
@@ -92,7 +116,7 @@ fn consumer_thread(rx: mpsc::Receiver<(i8,u8,Vec<u8>)>, server: Arc<Mutex<Server
 {
     for recieved in rx
     {
-        println!("Player {} sent Packet ID: {}", recieved.0, recieved.1);
+        //println!("Player {} sent Packet ID: {}", recieved.0, recieved.1);
 
         let packet_id: u8 = recieved.1;
         let player_id: i8 = recieved.0;
@@ -103,11 +127,15 @@ fn consumer_thread(rx: mpsc::Receiver<(i8,u8,Vec<u8>)>, server: Arc<Mutex<Server
             0 => {
                 let mut s = server.lock().unwrap();
                 client_packets::client_identification_packet(&mut s, &mut cur,player_id);
+
+                let frmt_str = format!("{} has joined the world.", s.clients.get_mut(&player_id).unwrap().player_name);
+                server_packets::server_chat_packet_broadcast(&mut s, &frmt_str);
             },
 
             5 =>
             {
-
+                let mut s = server.lock().unwrap();
+                client_packets::client_set_block_packet(&mut s, &mut cur, player_id);
             },
             8 =>
             {
@@ -119,6 +147,18 @@ fn consumer_thread(rx: mpsc::Receiver<(i8,u8,Vec<u8>)>, server: Arc<Mutex<Server
                 let mut s = server.lock().unwrap();
                 client_packets::client_chat_packet(&mut s, &mut cur, player_id);
             },
+
+            // Meta Packets for Server Management
+            255 =>
+            {
+                let mut s = server.lock().unwrap();
+                println!("Disconnect detected! Cleaning up player!");   
+
+                let frmt_str = format!("{} has left the world.", s.clients.get_mut(&player_id).unwrap().player_name);
+                server_packets::server_chat_packet_broadcast(&mut s, &frmt_str);
+                s.clients.remove(&player_id);
+                server_packets::despawn_player_broadcast(&mut s, player_id);
+            }
             _ =>
             {
                 println!("Unrecognized packet ID recieved");
@@ -127,11 +167,14 @@ fn consumer_thread(rx: mpsc::Receiver<(i8,u8,Vec<u8>)>, server: Arc<Mutex<Server
         }
     }
 }
+
+
 fn main()
 {
     let listener = TcpListener::bind("0.0.0.0:25565").unwrap();
     let server_rw = Arc::new(Mutex::new(Server::new("RSCube Server", "Lol")));
     
+    server_rw.lock().unwrap().world_load();
     let mut i: i8 = 0;
 
     let (tx, rx) = channel();
