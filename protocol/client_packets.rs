@@ -27,7 +27,6 @@ pub fn client_identification_packet(server: &mut Server, cur: &mut Cursor<&Vec<u
     let mut verification_key: [u8; 64] = [0x0; 64];
 
     {
-    let client = &mut server.clients.get_mut(&client_id).unwrap();
 
     let protocol: u8 = cur.read_u8().unwrap();
 
@@ -40,12 +39,22 @@ pub fn client_identification_packet(server: &mut Server, cur: &mut Cursor<&Vec<u
     let unused: u8 = cur.read_u8().unwrap();
     println!("Parsing packet");
 
+    {
+    let client = &mut server.clients.get_mut(&client_id).unwrap();
     client.player_name = String::from_utf8_lossy(&player_name).trim().to_string();
     server_identification_packet(client,"&4 RSCube &4","This is an MC Classic server written in Rust");
+    }
     println!("Server identification delivered!");
+    {
+    let client = &mut server.clients.get_mut(&client_id).unwrap();
     level_init(client);
-    world_coords = level_load(client);
-    
+    }
+    {
+    world_coords = level_load(server, client_id);
+    }
+
+    let client = &mut server.clients.get_mut(&client_id).unwrap();
+
     level_finalize(client,world_coords.0, world_coords.1, world_coords.2);
     spawn_player(client,-1,"",world_coords.3 << 5, world_coords.4 << 5,world_coords.5 << 5);
 
@@ -89,7 +98,7 @@ pub fn client_position_packet(server: &mut Server, cur: &mut Cursor<&Vec<u8>>,cl
     //println!("Position: [ X: {}, Y: {}, Z: {} ]",X>>5,Y>>5,Z>>5);
 }
 
-pub fn client_set_block_packet(server: &mut Server, cur:&mut Cursor<Vec<u8>>, client_id: i8)
+pub fn client_set_block_packet(server: &mut Server, cur:&mut Cursor<&Vec<u8>>, client_id: i8)
 {
     let client = &mut server.clients.get_mut(&client_id).unwrap();
 
@@ -101,6 +110,14 @@ pub fn client_set_block_packet(server: &mut Server, cur:&mut Cursor<Vec<u8>>, cl
     let block_id: u8 = cur.read_u8().unwrap();
 
     println!("Set block for block ID: {} at position {} {} {} with mode: {}",block_id,x,y,z,mode);
+    if (mode == 1)
+    {
+        server_set_block_packet_broadcast(server, x,y,z,block_id);
+    }
+    else{
+        server_set_block_packet_broadcast(server, x,y,z,0);
+
+    }
 }
 
 pub fn client_chat_packet(server: &mut Server,cur: &mut Cursor<&Vec<u8>>,client_id: i8)
@@ -110,7 +127,7 @@ pub fn client_chat_packet(server: &mut Server,cur: &mut Cursor<&Vec<u8>>,client_
     let unused: u8 = cur.read_u8().unwrap();
 
     let mut string_buffer: [u8; 64] = [0; 64];
-    cur.read_exact(&mut string_buffer);
+    cur.read_exact(&mut string_buffer).unwrap();
 
     let chat_message = String::from_utf8_lossy(&string_buffer);
     println!("[CHAT] {}: {}",client.player_name,chat_message);
