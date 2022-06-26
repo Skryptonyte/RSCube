@@ -10,6 +10,7 @@ use byteorder::{BigEndian, LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::fs::File;
 
 use crate::server_packets::*;
+use crate::protocol::server_cpe_packets::*;
 use crate::client::Client;
 use crate::server::Server;
 
@@ -37,23 +38,30 @@ pub fn client_identification_packet(server: &mut Server, cur: &mut Cursor<&Vec<u
     cur.read_exact(&mut verification_key).unwrap();
 
     let unused: u8 = cur.read_u8().unwrap();
+
+    if (unused == 0x42)
+    {
+        cpe_server_extinfo(server,client_id,0);
+    }
     println!("Parsing packet");
 
     {
-    let client = &mut server.clients.get_mut(&client_id).unwrap();
-    client.player_name = String::from_utf8_lossy(&player_name).trim().to_string();
-    server_identification_packet(client,"&4 RSCube &4","This is an MC Classic server written in Rust");
+    {
+        let client = server.clients.get_mut(&client_id).unwrap();
+        client.player_name = String::from_utf8_lossy(&player_name).trim().to_string();
+    }
+    server_identification_packet(server,client_id);
     }
     println!("Server identification delivered!");
     {
-    let client = &mut server.clients.get_mut(&client_id).unwrap();
+    let client = server.clients.get_mut(&client_id).unwrap();
     level_init(client);
     }
     {
     world_coords = level_load(server, client_id);
     }
 
-    let client = &mut server.clients.get_mut(&client_id).unwrap();
+    let client = server.clients.get_mut(&client_id).unwrap();
 
     level_finalize(client,world_coords.0, world_coords.1, world_coords.2);
     spawn_player(client,-1,"",world_coords.3 << 5, world_coords.4 << 5,world_coords.5 << 5);
@@ -122,7 +130,7 @@ pub fn client_set_block_packet(server: &mut Server, cur:&mut Cursor<&Vec<u8>>, c
 
 pub fn client_chat_packet(server: &mut Server,cur: &mut Cursor<&Vec<u8>>,client_id: i8)
 {
-    let client = &mut server.clients.get_mut(&client_id).unwrap();
+    let client = server.clients.get_mut(&client_id).unwrap();
 
     let unused: u8 = cur.read_u8().unwrap();
 
@@ -130,9 +138,16 @@ pub fn client_chat_packet(server: &mut Server,cur: &mut Cursor<&Vec<u8>>,client_
     cur.read_exact(&mut string_buffer).unwrap();
 
     let chat_message = String::from_utf8_lossy(&string_buffer);
+    let chat_message = chat_message.trim();
     println!("[CHAT] {}: {}",client.player_name,chat_message);
 
-    let s: String = format!("{}: {}",client.player_name, chat_message);
-
-    server_chat_packet_broadcast(server, &s);
+    if (chat_message.starts_with("/"))
+    {
+        server_chat_packet(server,client_id,&format!("No such command: {}",chat_message));
+    }
+    else
+    {
+        let s: String = format!("{}: {}",client.player_name, chat_message);
+        server_chat_packet_broadcast(server, client_id, &s);
+    }
 }

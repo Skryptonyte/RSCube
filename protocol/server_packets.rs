@@ -20,23 +20,23 @@ use std::io::BufWriter;
 
 use crate::server::Server;
 
-pub fn server_identification_packet(client: &mut Client, server_name: &str, motd: &str)
+pub fn server_identification_packet(server: &mut Server, client_id: i8)
 {
     let mut packet: [u8; 131] = [0;131];
-    let s: &str= "Rusty Cunt";
     packet[0] = 0x0;
     packet[1] = 0x7;
 
-    for i in 0..cmp::min(64,server_name.len())
+    for i in 0..cmp::min(64,server.server_name.len())
     {
-        packet[2+i] = server_name.as_bytes()[i];
+        packet[2+i] = server.server_name.as_bytes()[i];
     }
 
-    for i in 0..cmp::min(64,motd.len())
+    for i in 0..cmp::min(64,server.server_motd.len())
     {
-        packet[66+i] = motd.as_bytes()[i];
+        packet[66+i] = server.server_motd.as_bytes()[i];
     }
 
+    let client = &mut server.clients.get_mut(&client_id).unwrap();
     println!("Sending packet: {}",String::from_utf8_lossy(&packet));
     client.stream.write(&packet).unwrap();
 }
@@ -51,35 +51,7 @@ pub fn level_init(client: &mut Client)
 pub fn level_load(server: &mut Server, client_id: i8) -> (u16, u16, u16, u16, u16, u16)
 {
     let tuple: (u16, u16, u16, u16, u16, u16);
-
-    /*
-    let mut file = File::open("world.lvl").unwrap();
-
-    let mut header: [u8; 18] = [0; 18];
-    let mut data: Vec<u8> = Vec::new();
-
-    let mut d = GzDecoder::new(file);
-
-    d.read_exact(&mut header).unwrap();
-
-    let mut cur = Cursor::new(&header);
-    let magicNumber = cur.read_u16::<LittleEndian>().unwrap();
-    println!("Magic Number: {}", magicNumber);
-
-    let world_X: u16 = cur.read_u16::<LittleEndian>().unwrap();
-    let world_Z: u16 = cur.read_u16::<LittleEndian>().unwrap();
-    let world_Y: u16 = cur.read_u16::<LittleEndian>().unwrap();
-
-    let spawn_X: u16 = cur.read_u16::<LittleEndian>().unwrap();
-    let spawn_Z: u16 = cur.read_u16::<LittleEndian>().unwrap();
-    let spawn_Y: u16 = cur.read_u16::<LittleEndian>().unwrap();
-
-    println!("World Size: {} x {} x {}", world_X, world_Y, world_Z);
-
-
-    d.read_to_end(&mut data).unwrap();
-    */
-
+    
     let (world_X, world_Y, world_Z, spawn_X, spawn_Y, spawn_Z) = (server.world_x, server.world_y, server.world_z, server.spawn_x, server.spawn_y, server.spawn_z);
     let mut gzipped_map: Vec<u8> = Vec::new();
 
@@ -186,27 +158,66 @@ pub fn despawn_player_broadcast(server: & Server, player_id: i8)
         stream.write(&packet);
     }
 }
-pub fn server_chat_packet_broadcast(server: &mut Server ,message: &str)
+
+pub fn server_chat_packet(server: &mut Server ,client_id: i8,message: &str)
 {
-    let mut packet: Vec<u8> = Vec::new();
-
-    packet.write_u8(0xd).unwrap();
-    packet.write_i8(-1).unwrap();
+    let client = & server.clients.get(&client_id).unwrap();
+    let mut stream = & client.stream;
 
 
-    for i in 0..cmp::min(64,message.len())
+    let mut i: usize = 0;
+
+    while (i < message.len())
     {
-        packet.push(message.as_bytes()[i]);
+        println!("Offset: {}, Message Length: {}",i,message.len());
+        let mut packet: Vec<u8> = Vec::new();
+
+        packet.write_u8(0xd).unwrap();
+        packet.write_i8(client_id).unwrap();
+    
+        for j in i..cmp::min(i+64,message.len())
+        {
+            packet.push(message.as_bytes()[j]);
+        }
+    
+        for j in cmp::min(i+64,message.len())..(i+64)
+        {
+            packet.push(0x20);
+        }
+
+        stream.write(&packet).unwrap();
+        i += 64;
     }
+}
 
-    for i in cmp::min(64,message.len())..64
-    {
-        packet.push(0x20);
-    }
+pub fn server_chat_packet_broadcast(server: &mut Server ,client_id: i8, message: &str)
+{
+    let mut i: usize = 0;
 
-    for (player_id, client) in &mut server.clients
+    while (i < message.len())
     {
-        client.stream.write(&packet).unwrap();
+        println!("Offset: {}, Message Length: {}",i,message.len());
+        let mut packet: Vec<u8> = Vec::new();
+
+        packet.write_u8(0xd).unwrap();
+        packet.write_i8(client_id).unwrap();
+    
+        for j in i..cmp::min(i+64,message.len())
+        {
+            packet.push(message.as_bytes()[j]);
+        }
+    
+        for j in cmp::min(i+64,message.len())..(i+64)
+        {
+            packet.push(0x20);
+        }
+
+        for (player_id, client) in &mut server.clients
+        {
+            client.stream.write(&packet).unwrap();
+        }
+
+        i += 64;
     }
 }
 
@@ -261,3 +272,10 @@ pub fn server_position_packet_broadcast(server: &mut Server, calling_player_id: 
         }
     }
 }
+
+/*
+pub fn server_update_user_type(server: &mut Server, client_id: i8)
+{
+     
+}
+*/
