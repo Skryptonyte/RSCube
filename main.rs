@@ -20,6 +20,8 @@ mod protocol;
 
 use protocol::client_packets;
 use protocol::server_packets;
+use protocol::client_cpe_packets;
+
 
 mod client;
 mod server;
@@ -41,10 +43,6 @@ fn recieve_packets(mut stream: &mut TcpStream, player_id: i8, tx: & mpsc::Sender
 
         match packetID[0]
         {
-            255 =>
-            {
-
-            }
             0 => {
                 let mut packet_data: [u8; 130] = [0;130];
                 stream.read_exact(&mut packet_data)?;
@@ -72,6 +70,19 @@ fn recieve_packets(mut stream: &mut TcpStream, player_id: i8, tx: & mpsc::Sender
                 tx.send((player_id, packetID[0], packet_data.to_vec())).unwrap();
 
                 //client_packets::client_chat_packet(&mut s, player_id);
+            },
+            16 =>
+            {
+                println!("ExtInfo recieved!");
+                let mut packet_data: [u8; 66] = [0;66];
+                stream.read_exact(&mut packet_data)?;
+                tx.send((player_id, packetID[0], packet_data.to_vec())).unwrap();
+            },
+            17 =>
+            {
+                println!("ExtEntry recieved!");
+                let mut packet_data: [u8; 68] = [0;68];
+                stream.read_exact(&mut packet_data)?;
             },
             _ =>   {
                 println!("Invalid packet ID {} recieved! Terminating", packetID[0]);
@@ -101,6 +112,7 @@ fn handle_client(mut stream: TcpStream, player_id: i8, tx: mpsc::Sender<(i8,u8, 
         Ok(()) => 
         {
         println!("Client thread terminated cleanly!");
+        tx.send((player_id,255,Vec::new()));
         }
         Err(e) => 
         {
@@ -129,7 +141,7 @@ fn consumer_thread(rx: mpsc::Receiver<(i8,u8,Vec<u8>)>, server: Arc<Mutex<Server
                 client_packets::client_identification_packet(&mut s, &mut cur,player_id);
 
                 let frmt_str = format!("{} has joined the world.", s.clients.get_mut(&player_id).unwrap().player_name);
-                server_packets::server_chat_packet_broadcast(&mut s, &frmt_str);
+                server_packets::server_chat_packet_broadcast(&mut s, -1,&frmt_str);
             },
 
             5 =>
@@ -147,7 +159,11 @@ fn consumer_thread(rx: mpsc::Receiver<(i8,u8,Vec<u8>)>, server: Arc<Mutex<Server
                 let mut s = server.lock().unwrap();
                 client_packets::client_chat_packet(&mut s, &mut cur, player_id);
             },
-
+            0x10 =>
+            {
+                let mut s = server.lock().unwrap();
+                client_cpe_packets::cpe_client_extinfo(&mut s, &mut cur, player_id);
+            },
             // Meta Packets for Server Management
             255 =>
             {
@@ -155,9 +171,9 @@ fn consumer_thread(rx: mpsc::Receiver<(i8,u8,Vec<u8>)>, server: Arc<Mutex<Server
                 println!("Disconnect detected! Cleaning up player!");   
 
                 let frmt_str = format!("{} has left the world.", s.clients.get_mut(&player_id).unwrap().player_name);
-                server_packets::server_chat_packet_broadcast(&mut s, &frmt_str);
+                server_packets::server_chat_packet_broadcast(&mut s,-1, &frmt_str);
                 s.clients.remove(&player_id);
-                server_packets::despawn_player_broadcast(&mut s, player_id);
+                server_packets::despawn_player_broadcast(&mut s,player_id);
             }
             _ =>
             {
@@ -172,7 +188,7 @@ fn consumer_thread(rx: mpsc::Receiver<(i8,u8,Vec<u8>)>, server: Arc<Mutex<Server
 fn main()
 {
     let listener = TcpListener::bind("0.0.0.0:25565").unwrap();
-    let server_rw = Arc::new(Mutex::new(Server::new("RSCube Server", "Lol")));
+    let server_rw = Arc::new(Mutex::new(Server::new("&4 RSCube &4","This is an MC Classic server written in Rust")));
     
     server_rw.lock().unwrap().world_load();
     let mut i: i8 = 0;
