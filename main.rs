@@ -73,16 +73,21 @@ fn recieve_packets(mut stream: &mut TcpStream, player_id: i8, tx: & mpsc::Sender
             },
             16 =>
             {
-                println!("ExtInfo recieved!");
                 let mut packet_data: [u8; 66] = [0;66];
                 stream.read_exact(&mut packet_data)?;
                 tx.send((player_id, packetID[0], packet_data.to_vec())).unwrap();
             },
             17 =>
             {
-                println!("ExtEntry recieved!");
                 let mut packet_data: [u8; 68] = [0;68];
                 stream.read_exact(&mut packet_data)?;
+                tx.send((player_id, packetID[0], packet_data.to_vec())).unwrap();
+            },
+            0x2B =>
+            {
+                let mut packet_data: [u8; 3] = [0; 3];
+                stream.read_exact(&mut packet_data)?;
+                tx.send((player_id, packetID[0], packet_data.to_vec())).unwrap();
             },
             _ =>   {
                 println!("Invalid packet ID {} recieved! Terminating", packetID[0]);
@@ -164,6 +169,16 @@ fn consumer_thread(rx: mpsc::Receiver<(i8,u8,Vec<u8>)>, server: Arc<Mutex<Server
                 let mut s = server.lock().unwrap();
                 client_cpe_packets::cpe_client_extinfo(&mut s, &mut cur, player_id);
             },
+            0x11 =>
+            {
+                let mut s = server.lock().unwrap();
+                client_cpe_packets::cpe_client_extentry(&mut s, &mut cur, player_id);
+            },
+            0x2B =>
+            {
+                let mut s = server.lock().unwrap();
+                client_cpe_packets::cpe_client_twowayping(&mut s, &mut cur, player_id);
+            }
             // Meta Packets for Server Management
             255 =>
             {
