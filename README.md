@@ -7,8 +7,7 @@ A Minecraft Classic Server written in Rust. It is a multi-threaded server built 
 * Base MC Classic Protocol
 * Multi-Threading in a Multi Producer-Single Consumer architecture.
 * In Memory World Persistence
-* Initial CPE Handshake Support
-
+* Initial CPE Support (Handshake and TwoWayPing)
 # TODO
 
 * Periodic Heartbeats

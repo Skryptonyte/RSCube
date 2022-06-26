@@ -19,39 +19,12 @@ use std::sync::Arc;
 use std::io::Cursor;
 
 
-pub fn client_identification_packet(server: &mut Server, cur: &mut Cursor<&Vec<u8>>, client_id: i8)
+pub fn login_procedure(server: &mut Server, cur: &mut Cursor<&Vec<u8>>, client_id: i8)
 {
-    println!("Client packet recieved");
-
     let world_coords: (u16, u16, u16, u16, u16, u16);
-    let mut player_name: [u8; 64] = [0x0; 64];
-    let mut verification_key: [u8; 64] = [0x0; 64];
 
-    {
-
-    let protocol: u8 = cur.read_u8().unwrap();
-
-    let mut player_name: [u8; 64] = [0x0; 64];
-    let mut verification_key: [u8; 64] = [0x0; 64];
-
-    cur.read_exact(&mut player_name).unwrap();
-    cur.read_exact(&mut verification_key).unwrap();
-
-    let unused: u8 = cur.read_u8().unwrap();
-
-    if (unused == 0x42)
-    {
-        cpe_server_extinfo(server,client_id,0);
-    }
-    println!("Parsing packet");
-
-    {
-    {
-        let client = server.clients.get_mut(&client_id).unwrap();
-        client.player_name = String::from_utf8_lossy(&player_name).trim().to_string();
-    }
     server_identification_packet(server,client_id);
-    }
+    
     println!("Server identification delivered!");
     {
     let client = server.clients.get_mut(&client_id).unwrap();
@@ -66,7 +39,7 @@ pub fn client_identification_packet(server: &mut Server, cur: &mut Cursor<&Vec<u
     level_finalize(client,world_coords.0, world_coords.1, world_coords.2);
     spawn_player(client,-1,"",world_coords.3 << 5, world_coords.4 << 5,world_coords.5 << 5);
 
-    }
+    
     let client_table = & server.clients;
     let main_client = & server.clients.get(&client_id).unwrap();
     for (player_id, other_client) in client_table
@@ -76,6 +49,42 @@ pub fn client_identification_packet(server: &mut Server, cur: &mut Cursor<&Vec<u
         spawn_player(other_client,client_id,&main_client.player_name,world_coords.3 << 5, world_coords.4 << 5,world_coords.5 << 5);
         spawn_player(main_client, *player_id, &other_client.player_name, world_coords.3 << 5, world_coords.4 << 5,world_coords.5 << 5);
         }
+    }
+}
+pub fn client_identification_packet(server: &mut Server, cur: &mut Cursor<&Vec<u8>>, client_id: i8)
+{
+    println!("Client packet recieved");
+
+    let mut player_name: [u8; 64] = [0x0; 64];
+    let mut verification_key: [u8; 64] = [0x0; 64];
+
+    
+
+    let protocol: u8 = cur.read_u8().unwrap();
+
+    let mut player_name: [u8; 64] = [0x0; 64];
+    let mut verification_key: [u8; 64] = [0x0; 64];
+
+    cur.read_exact(&mut player_name).unwrap();
+    cur.read_exact(&mut verification_key).unwrap();
+
+    let unused: u8 = cur.read_u8().unwrap();
+
+
+    println!("Parsing packet");
+
+    
+    {
+        let client = server.clients.get_mut(&client_id).unwrap();
+        client.player_name = String::from_utf8_lossy(&player_name).trim().to_string();
+    }
+    if (unused == 0x42)
+    {
+        cpe_server_extinfo(server,client_id,1);
+        cpe_server_extentry(server, client_id, "TwoWayPing", 1);
+    }
+    else{
+        login_procedure(server, cur, client_id);
     }
 }
 
