@@ -1,11 +1,14 @@
 use std::net::TcpStream;
 use std::collections::HashMap;
-
+use flate2::Compression;
 use std::io::Cursor;
 use std::fs::File;
 use byteorder::{BigEndian, LittleEndian, ReadBytesExt, WriteBytesExt};
 use flate2::read::GzDecoder;
-use std::io::{Read, Write};
+use flate2::write::GzEncoder;
+use std::io::{Read, Write, Seek, SeekFrom};
+use std::fs::OpenOptions;
+
 use crate::client::Client;
 pub struct Server {
     pub server_name: String,
@@ -57,4 +60,24 @@ impl Server{
             d.read_to_end(&mut self.world_data).unwrap();
 
         }
+
+    pub fn world_save(self: &mut Server)
+    {
+        let mut file = OpenOptions::new()
+        .write(true).open("world.lvl").unwrap();
+
+        let mut enc = GzEncoder::new(&mut file,Compression::default());
+        
+        enc.write_u16::<LittleEndian>(1874).unwrap();
+        enc.write_u16::<LittleEndian>(self.world_x).unwrap();
+        enc.write_u16::<LittleEndian>(self.world_z).unwrap();
+        enc.write_u16::<LittleEndian>(self.world_y).unwrap();
+        enc.write_u16::<LittleEndian>(self.spawn_x).unwrap();
+        enc.write_u16::<LittleEndian>(self.spawn_z).unwrap();
+        enc.write_u16::<LittleEndian>(self.spawn_y).unwrap();
+
+        enc.write_u32::<LittleEndian>(0);
+
+        enc.write(& self.world_data);
+    }
 }
