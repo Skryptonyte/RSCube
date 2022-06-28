@@ -137,6 +137,46 @@ pub fn client_set_block_packet(server: &mut Server, cur:&mut Cursor<&Vec<u8>>, c
     }
 }
 
+fn parse_command(server: &mut Server, client_id: i8, cmd_str: &str) -> Result<(),Box<dyn std::error::Error>>
+{
+
+    let args = cmd_str.split_whitespace().collect::<Vec<&str>>();
+
+    if args[0].eq("tp")
+    {
+        if args.len() != 4
+        {
+            server_chat_packet(server,client_id, "Syntax: /tp <X> <Y> <Z>");
+            return Ok(());
+        }
+
+        let X: u16 = args[1].parse()?;
+        let Y: u16 = args[2].parse()?;
+        let Z: u16 = args[3].parse()?;
+
+
+        server_chat_packet(server,client_id, "Teleporting");
+        server_position_packet(server, client_id, X<<5, Y<<5, Z<<5, 0, 0);
+    }
+    else if args[0].eq("op")
+    {
+        server_update_user_type(server,client_id,0x64);
+        server_chat_packet(server,client_id,"You are now OP");
+    }
+    else if args[0].eq("kickself")
+    {
+        server_disconnect_player(server,client_id,"TEST KICK!");
+    }
+    else if args[0].eq("save")
+    {
+        server.world_save();
+    }
+    else{
+        server_chat_packet(server,client_id,&format!("No such command: {}",args[0]));
+    }
+
+    return Ok(());
+}
 pub fn client_chat_packet(server: &mut Server,cur: &mut Cursor<&Vec<u8>>,client_id: i8)
 {
     let client = server.clients.get_mut(&client_id).unwrap();
@@ -148,11 +188,22 @@ pub fn client_chat_packet(server: &mut Server,cur: &mut Cursor<&Vec<u8>>,client_
 
     let chat_message = String::from_utf8_lossy(&string_buffer);
     let chat_message = chat_message.trim();
-    println!("[CHAT] {}: {}",client.player_name,chat_message);
+    println!("[CHAT] {}: {}",client.player_name,&chat_message);
 
     if (chat_message.starts_with("/"))
     {
-        server_chat_packet(server,client_id,&format!("No such command: {}",chat_message));
+        let command = &chat_message[1..];
+        match (parse_command(server, client_id, command))
+        {
+            Ok(_) => {
+                println!("Command executed successfully");
+            }
+            Err(e) =>
+            {
+                println!("[WARN] An error occurred during execution of command!");
+            }
+        }
+
     }
     else
     {

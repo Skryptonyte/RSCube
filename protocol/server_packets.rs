@@ -155,7 +155,7 @@ pub fn despawn_player_broadcast(server: & Server, player_id: i8)
     for (c_id, client) in & server.clients
     {
         let mut stream = &client.stream;
-        stream.write(&packet);
+        stream.write(&packet).unwrap();
     }
 }
 
@@ -249,6 +249,27 @@ pub fn server_set_block_packet_broadcast(server: &mut Server, x: u16, y: u16, z:
         stream.write(& packet).unwrap();
     }
 }
+
+pub fn server_position_packet(server: &mut Server, client_id: i8, x: u16, y: u16, z: u16, yaw: u8, pitch: u8)
+{
+    let mut packet: Vec<u8> = Vec::new();
+
+    packet.write_u8(0x8).unwrap();
+    packet.write_i8(-1).unwrap();
+
+    packet.write_u16::<BigEndian>(x).unwrap();
+    packet.write_u16::<BigEndian>(y).unwrap();
+    packet.write_u16::<BigEndian>(z).unwrap();
+
+    packet.write_u8(yaw).unwrap();
+    packet.write_u8(pitch).unwrap();
+
+
+    let client = server.clients.get_mut(&client_id).unwrap();
+    client.stream.write(&packet).unwrap();
+
+}
+
 pub fn server_position_packet_broadcast(server: &mut Server, calling_player_id: i8, x: u16, y: u16, z: u16, yaw: u8, pitch: u8)
 {
     let mut packet: Vec<u8> = Vec::new();
@@ -273,9 +294,30 @@ pub fn server_position_packet_broadcast(server: &mut Server, calling_player_id: 
     }
 }
 
-/*
-pub fn server_update_user_type(server: &mut Server, client_id: i8)
+pub fn server_disconnect_player(server: &mut Server, client_id: i8, message: &str)
 {
-     
+    let mut packet: Vec<u8> = Vec::new();
+
+    packet.write_u8(0xe).unwrap();
+
+    for i in 0..cmp::min(message.len(),64)
+    {
+        packet.write_u8(message.as_bytes()[i]);
+    }
+
+    for i in cmp::min(message.len(),64)..64
+    {
+        packet.write_u8(0x20);
+    }
+    server.clients.get_mut(&client_id).unwrap().stream.write(&packet).unwrap();
 }
-*/
+
+pub fn server_update_user_type(server: &mut Server, client_id: i8, user_type: u8)
+{
+    let mut packet: Vec<u8> = Vec::new();
+
+    packet.write_u8(0xf).unwrap();
+    packet.write_u8(user_type).unwrap();
+
+    server.clients.get_mut(&client_id).unwrap().stream.write(&packet).unwrap();
+}
