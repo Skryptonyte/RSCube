@@ -206,7 +206,6 @@ fn main()
     let server_rw = Arc::new(Mutex::new(Server::new("&4 RSCube &4","This is an MC Classic server written in Rust")));
     
     server_rw.lock().unwrap().world_load();
-    let mut i: i8 = 0;
 
     let (tx, rx) = channel();
 
@@ -221,13 +220,11 @@ fn main()
     {
         let mut s = client_add_lock.lock().unwrap();
 
-        i = i+1;
         let new_tx = tx.clone();
         let write_stream = stream.unwrap();
         let read_stream = write_stream.try_clone().unwrap();
 
-        let newClient = Client::new(i, write_stream);
-        s.clients.insert(i, newClient);
+        let i: i8 = s.add_client(write_stream);
 
         thread::spawn(move || {
             handle_client(read_stream, i,new_tx);

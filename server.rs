@@ -15,6 +15,7 @@ pub struct Server {
     pub server_motd: String,
     pub software_name: String,
     pub clients: HashMap<i8, Client>,
+    pub name_to_id: HashMap<String, Client>,
     pub world_data: Vec<u8>,
     pub world_x: u16,
     pub world_z: u16,
@@ -31,9 +32,33 @@ impl Server{
             server_motd: String::from(server_motd), 
             software_name: String::from("RSCube 0.0.1"),
             clients: HashMap::new(), 
+            name_to_id: HashMap::new(),
             world_data: Vec::new(), world_x: 0, world_y: 0, world_z: 0, spawn_x: 0, spawn_y: 0, spawn_z: 0};
     }
 
+    pub fn add_client(self: &mut Server, stream: TcpStream) -> i8
+    {
+        let mut key: i8 = -1;
+        for i in 0..127
+        {
+            if !self.clients.contains_key(&i)
+            {
+                key = i;
+                break;
+            }
+        }
+
+        if (key < 0)
+        {
+            println!("[WARN] Player ID pool exhausted");
+        }
+        else{
+            println!("New player ID assigned: {}", key);
+            self.clients.insert(key, Client::new(key,stream));
+        }
+
+        return key;
+    }
     pub fn world_load(self: &mut Server)
         {
             let file = File::open("world.lvl").unwrap();
