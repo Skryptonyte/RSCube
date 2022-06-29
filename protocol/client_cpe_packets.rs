@@ -51,13 +51,51 @@ pub fn cpe_client_extentry(server: &mut Server, cur: &mut Cursor<&Vec<u8>>, clie
     client.extension_count_state = client.extension_count_state - 1;
     println!("CPE Extension Name: {} ( Version : {} )",app_name,version);
 
-    if (client.extension_count_state == 0)
+    match app_name
     {
+        "FastMap" =>
+        {
+            println!("FastMap Enabled!");
+            client.fastmap = true;
+        }
+        "CustomBlocks" =>
+        {
+            client.customblocksupportlevel = 1;
+        }
+        _ =>
+        {
+
+        }
+    }
+    if client.extension_count_state == 0
+    {
+        if client.expecting_customblock == 0
+        {
+            println!("Resume normal login!");
+            login_procedure(server, cur, client_id);
+        }
+        else
+        {
+            cpe_server_customblocklevelsupport(server, client_id, 1);
+        }
+    }
+}
+
+pub fn cpe_client_customblocksupportlevel(server: &mut Server, cur: &mut Cursor<&Vec<u8>>, client_id: i8)
+{
+    println!("Recieving Custom Block Level support!");
+
+    let support_level = cur.read_u8();
+
+    let client = server.clients.get_mut(&client_id).unwrap();
+
+    if client.expecting_customblock == 1
+    {
+        client.expecting_customblock = 0;
         println!("Resume normal login!");
         login_procedure(server, cur, client_id);
     }
 }
-
 pub fn cpe_client_twowayping(server: &mut Server, cur: &mut Cursor<&Vec<u8>>, client_id: i8)
 {
     let direction: u8 = cur.read_u8().unwrap();

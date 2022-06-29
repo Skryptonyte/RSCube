@@ -7,7 +7,7 @@ use std::cmp;
 
 use std::io::prelude::*;
 use flate2::read::GzDecoder;
-use flate2::write::GzEncoder;
+use flate2::write::{GzEncoder, DeflateEncoder};
 use flate2::Compression;
 use std::io::Cursor;
 use byteorder::{BigEndian, LittleEndian, ReadBytesExt, WriteBytesExt};
@@ -41,11 +41,25 @@ pub fn server_identification_packet(server: &mut Server, client_id: i8)
     client.stream.write(&packet).unwrap();
 }
 
-pub fn level_init(client: &mut Client)
+pub fn level_init(server: &mut Server, client_id: i8)
 {
-    let mut packet: [u8; 1] = [2];
+    let client = server.clients.get_mut(&client_id).unwrap();
 
-    client.stream.write(&packet).unwrap();
+    let use_fastmap: bool = client.fastmap;
+
+    if (use_fastmap)
+    {
+        let mut packet: Vec<u8> = Vec::new();
+
+        packet.write_u8(2);
+        let world_size:u32 = (u32::from(server.world_x) * u32::from(server.world_y) * u32::from(server.world_z)).into();
+        packet.write_u32::<BigEndian>(world_size);
+        client.stream.write(&packet).unwrap();
+    }
+    else{
+        let mut packet: [u8; 1] = [2];
+        client.stream.write(&packet).unwrap();
+    }
 }
 
 pub fn level_load(server: &mut Server, client_id: i8) -> (u16, u16, u16, u16, u16, u16)
@@ -58,19 +72,27 @@ pub fn level_load(server: &mut Server, client_id: i8) -> (u16, u16, u16, u16, u1
     let mut data: Vec<u8> = Vec::new();
 
 
+    let use_fastmap: bool = server.clients.get(&client_id).unwrap().fastmap;
+
     let world_size:u32 = (u32::from(world_X) * u32::from(world_Y) * u32::from(world_Z)).into();
-    data.write_u32::<BigEndian>(world_size).unwrap();
-    data.write(& server.world_data);
 
-
+    if (!use_fastmap)
     {
-    let mut e = GzEncoder::new(&mut gzipped_map, Compression::default());
-    e.write(&data).unwrap();
+        println!("Loading level [Fastmap: false]");
+        let mut e = GzEncoder::new(&mut gzipped_map, Compression::default());
+        e.write_u32::<BigEndian>(world_size).unwrap();
+        e.write(& server.world_data).unwrap();
+    }
+    else
+    {
+        println!("Loading level [Fastmap: true]");
+        let mut e = DeflateEncoder::new(&mut gzipped_map, Compression::default());
+        e.write(& server.world_data).unwrap();
     }
     println!("World data size: {}", data.len());
     println!("Gzipped data size: {}", gzipped_map.len());
 
-    let client = & server.clients.get(&client_id).unwrap();
+    let client = server.clients.get(&client_id).unwrap();
 
     let mut i: usize = 0;
     while usize::from(i) < gzipped_map.len()
@@ -225,6 +247,26 @@ pub fn server_set_block_packet_broadcast(server: &mut Server, x: u16, y: u16, z:
 {
     let mut packet: Vec<u8> = Vec::new();
 
+    let block_id_fallback = match block_id
+    {
+        0x32 => 0x2c,
+        0x33 => 0x27,
+        0x34 => 0xc,
+        0x35 => 0x0,
+        0x36 => 0xa,
+        0x37 => 0x21,
+        0x38 => 0x19,
+        0x39 => 0x3,
+        0x3a => 0x1d,
+        0x3b => 0x1c,
+        0x3c => 0x14,
+        0x3d => 0x2a,
+        0x3e => 0x31,
+        0x3f => 0x24,
+        0x40 => 0x5,
+        0x41 => 0x1,
+        _ => block_id
+    };
     packet.write_u8(0x6).unwrap();
 
     packet.write_u16::<BigEndian>(x).unwrap();
@@ -246,6 +288,15 @@ pub fn server_set_block_packet_broadcast(server: &mut Server, x: u16, y: u16, z:
     {
         println!("Block change sent with block_id: {}", block_id);
         let mut stream = & client.stream;   
+
+        if (client.customblocksupportlevel >= 1)
+        {
+            packet[7] = block_id;
+        }
+        else
+        {
+            packet[7] = block_id_fallback;
+        }
         stream.write(& packet).unwrap();
     }
 }
