@@ -30,7 +30,7 @@ impl Server{
     {
         return Server {server_name: String::from(server_name), 
             server_motd: String::from(server_motd), 
-            software_name: String::from("RSCube 0.0.1"),
+            software_name: String::from("RSCube 0.0.2"),
             clients: HashMap::new(), 
             name_to_id: HashMap::new(),
             world_data: Vec::new(), world_x: 0, world_y: 0, world_z: 0, spawn_x: 0, spawn_y: 0, spawn_z: 0};

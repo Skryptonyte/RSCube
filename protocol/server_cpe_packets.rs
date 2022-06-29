@@ -68,6 +68,17 @@ pub fn cpe_server_extentry(server: &mut Server, client_id: i8, app_name: &str,ve
     client.stream.write(&packet).unwrap();
 }
 
+pub fn cpe_server_customblocklevelsupport(server: &mut Server, client_id: i8, support_level: u8)
+{
+    println!("Delivering Custom Block Level support!");
+    let mut packet: Vec<u8> = Vec::new();
+
+    packet.write_u8(0x13);
+    packet.write_u8(support_level);
+
+    let client = server.clients.get_mut(&client_id).unwrap();
+    client.stream.write(&packet);
+}
 pub fn cpe_server_twowayping(server: &mut Server, client_id: i8, direction: u8, unique_data: u16)
 {
     let mut packet: Vec<u8> = Vec::new();

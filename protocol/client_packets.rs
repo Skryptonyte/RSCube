@@ -27,8 +27,7 @@ pub fn login_procedure(server: &mut Server, cur: &mut Cursor<&Vec<u8>>, client_i
     
     println!("Server identification delivered!");
     {
-    let client = server.clients.get_mut(&client_id).unwrap();
-    level_init(client);
+    level_init(server, client_id);
     }
     {
     world_coords = level_load(server, client_id);
@@ -80,8 +79,11 @@ pub fn client_identification_packet(server: &mut Server, cur: &mut Cursor<&Vec<u
     }
     if (unused == 0x42)
     {
-        cpe_server_extinfo(server,client_id,1);
+        cpe_server_extinfo(server,client_id,3);
         cpe_server_extentry(server, client_id, "TwoWayPing", 1);
+        cpe_server_extentry(server, client_id, "CustomBlocks", 1);
+        cpe_server_extentry(server, client_id, "FastMap", 1);
+
     }
     else{
         login_procedure(server, cur, client_id);

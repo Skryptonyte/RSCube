@@ -83,6 +83,12 @@ fn recieve_packets(mut stream: &mut TcpStream, player_id: i8, tx: & mpsc::Sender
                 stream.read_exact(&mut packet_data)?;
                 tx.send((player_id, packetID[0], packet_data.to_vec())).unwrap();
             },
+            0x13 =>
+            {
+                let mut packet_data: [u8; 1] = [0;1];
+                stream.read_exact(&mut packet_data)?;
+                tx.send((player_id, packetID[0], packet_data.to_vec())).unwrap();
+            },
             0x2B =>
             {
                 let mut packet_data: [u8; 3] = [0; 3];
@@ -174,6 +180,11 @@ fn consumer_thread(rx: mpsc::Receiver<(i8,u8,Vec<u8>)>, server: Arc<Mutex<Server
                 let mut s = server.lock().unwrap();
                 client_cpe_packets::cpe_client_extentry(&mut s, &mut cur, player_id);
             },
+            0x13 =>
+            {
+                let mut s = server.lock().unwrap();
+                client_cpe_packets::cpe_client_customblocksupportlevel(&mut s, &mut cur, player_id);
+            }
             0x2B =>
             {
                 let mut s = server.lock().unwrap();
