@@ -210,7 +210,22 @@ fn consumer_thread(rx: mpsc::Receiver<(i8,u8,Vec<u8>)>, server: Arc<Mutex<Server
     }
 }
 
-
+// WIP heartbeat
+fn heartbeat_thread()
+{
+    /*
+    let parameters =
+    [
+        ("name","RSCube Test"),
+        ("port", "25565"),
+        ("users", "1"),
+        ("max", "0"),
+        ("public", "true"),
+        ("salt","aaaaaa"),
+        ("software","RSCube 0.0.2")
+    ] 
+    */  
+}
 fn main()
 {
     let listener = TcpListener::bind("0.0.0.0:25565").unwrap();

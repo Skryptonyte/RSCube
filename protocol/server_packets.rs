@@ -38,7 +38,11 @@ pub fn server_identification_packet(server: &mut Server, client_id: i8)
 
     let client = &mut server.clients.get_mut(&client_id).unwrap();
     println!("Sending packet: {}",String::from_utf8_lossy(&packet));
-    client.stream.write(&packet).unwrap();
+    match client.stream.write(&packet)
+    {
+        Ok(_) => {},
+        Err(e) => {}
+    }
 }
 
 pub fn level_init(server: &mut Server, client_id: i8)
@@ -58,7 +62,11 @@ pub fn level_init(server: &mut Server, client_id: i8)
     }
     else{
         let mut packet: [u8; 1] = [2];
-        client.stream.write(&packet).unwrap();
+        match client.stream.write(&packet)
+        {
+            Ok(_) => {},
+            Err(e) => {}
+        }
     }
 }
 
@@ -117,7 +125,11 @@ pub fn level_load(server: &mut Server, client_id: i8) -> (u16, u16, u16, u16, u1
 
         println!("Sending level chunk [Offset: {}, Size: {}]",i,chunk_length);
         let mut stream = & client.stream;
-        stream.write(&packet).unwrap();
+        match stream.write(&packet)
+        {
+            Ok(_) => {},
+            Err(e) => {}
+        }
 
         i += 1024;
     }
@@ -133,7 +145,11 @@ pub fn level_finalize(client: &mut Client, world_x: u16, world_y:u16, world_z:u1
     packet.write_u16::<BigEndian>(world_y).unwrap();
     packet.write_u16::<BigEndian>(world_z).unwrap();
     println!("Finalizing Level Load");
-    client.stream.write(&packet).unwrap();
+    match client.stream.write(&packet)
+    {
+        Ok(_) => {},
+        Err(e) => {}
+    }
 }
 
 pub fn spawn_player(client: & Client, player_id: i8,player_name: &str, spawn_x: u16, spawn_y: u16, spawn_z: u16)
@@ -162,7 +178,11 @@ pub fn spawn_player(client: & Client, player_id: i8,player_name: &str, spawn_x: 
 
 
     let mut stream = &client.stream;
-    stream.write(&packet).unwrap();
+    match stream.write(&packet)
+    {
+        Ok(_) => {},
+        Err(e) => {}
+    }
 
 }
 
@@ -177,7 +197,11 @@ pub fn despawn_player_broadcast(server: & Server, player_id: i8)
     for (c_id, client) in & server.clients
     {
         let mut stream = &client.stream;
-        stream.write(&packet).unwrap();
+        match stream.write(&packet)
+        {
+            Ok(_) => {},
+            Err(e) => {}
+        }
     }
 }
 
@@ -207,7 +231,11 @@ pub fn server_chat_packet(server: &mut Server ,client_id: i8,message: &str)
             packet.push(0x20);
         }
 
-        stream.write(&packet).unwrap();
+        match stream.write(&packet)
+        {
+            Ok(_) => {},
+            Err(e) => {}
+        };
         i += 64;
     }
 }
@@ -236,7 +264,12 @@ pub fn server_chat_packet_broadcast(server: &mut Server ,client_id: i8, message:
 
         for (player_id, client) in &mut server.clients
         {
-            client.stream.write(&packet).unwrap();
+
+            match client.stream.write(&packet)
+            {
+                Ok(_) => {},
+                Err(e) => {}
+            }
         }
 
         i += 64;
@@ -297,7 +330,11 @@ pub fn server_set_block_packet_broadcast(server: &mut Server, x: u16, y: u16, z:
         {
             packet[7] = block_id_fallback;
         }
-        stream.write(& packet).unwrap();
+        match stream.write(&packet)
+        {
+            Ok(_) => {},
+            Err(e) => {}
+        }    
     }
 }
 
@@ -317,7 +354,11 @@ pub fn server_position_packet(server: &mut Server, client_id: i8, x: u16, y: u16
 
 
     let client = server.clients.get_mut(&client_id).unwrap();
-    client.stream.write(&packet).unwrap();
+    match client.stream.write(&packet)
+    {
+        Ok(_) => {},
+        Err(e) => {}
+    }
 
 }
 
@@ -340,7 +381,11 @@ pub fn server_position_packet_broadcast(server: &mut Server, calling_player_id: 
     {
         if (*player_id != calling_player_id)
         {
-            client.stream.write(&packet).unwrap();
+            match client.stream.write(&packet)
+            {
+                Ok(_) => {},
+                Err(e) => {}
+            }
         }
     }
 }
@@ -360,7 +405,11 @@ pub fn server_disconnect_player(server: &mut Server, client_id: i8, message: &st
     {
         packet.write_u8(0x20);
     }
-    server.clients.get_mut(&client_id).unwrap().stream.write(&packet).unwrap();
+    match server.clients.get_mut(&client_id).unwrap().stream.write(&packet)
+    {
+        Ok(_) => {},
+        Err(e) => {}
+    }
 }
 
 pub fn server_update_user_type(server: &mut Server, client_id: i8, user_type: u8)
@@ -370,5 +419,9 @@ pub fn server_update_user_type(server: &mut Server, client_id: i8, user_type: u8
     packet.write_u8(0xf).unwrap();
     packet.write_u8(user_type).unwrap();
 
-    server.clients.get_mut(&client_id).unwrap().stream.write(&packet).unwrap();
+    match server.clients.get_mut(&client_id).unwrap().stream.write(&packet)
+    {
+        Ok(_) => {},
+        Err(e) => {}
+    }
 }
