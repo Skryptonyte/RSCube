@@ -41,7 +41,11 @@ pub fn cpe_server_extinfo(server: &mut Server, client_id: i8, ext_count: i16)
 
     let client = server.clients.get_mut(&client_id).unwrap();
 
-    client.stream.write(&packet).unwrap();
+    match client.stream.write(&packet)
+    {
+        Ok(_) => {},
+        Err(e) => {}
+    }
 }
 
 
@@ -65,7 +69,11 @@ pub fn cpe_server_extentry(server: &mut Server, client_id: i8, app_name: &str,ve
 
     let client = server.clients.get_mut(&client_id).unwrap();
 
-    client.stream.write(&packet).unwrap();
+    match client.stream.write(&packet)
+    {
+        Ok(_) => {},
+        Err(e) => {}
+    }
 }
 
 pub fn cpe_server_customblocklevelsupport(server: &mut Server, client_id: i8, support_level: u8)
@@ -73,21 +81,29 @@ pub fn cpe_server_customblocklevelsupport(server: &mut Server, client_id: i8, su
     println!("Delivering Custom Block Level support!");
     let mut packet: Vec<u8> = Vec::new();
 
-    packet.write_u8(0x13);
-    packet.write_u8(support_level);
+    packet.write_u8(0x13).unwrap();
+    packet.write_u8(support_level).unwrap();
 
     let client = server.clients.get_mut(&client_id).unwrap();
-    client.stream.write(&packet);
+    match client.stream.write(&packet)
+    {
+        Ok(_) => {},
+        Err(e) => {}
+    }
 }
 pub fn cpe_server_twowayping(server: &mut Server, client_id: i8, direction: u8, unique_data: u16)
 {
     let mut packet: Vec<u8> = Vec::new();
 
-    packet.write_u8(0x2b);
-    packet.write_u8(direction);
+    packet.write_u8(0x2b).unwrap();
+    packet.write_u8(direction).unwrap();
 
-    packet.write_u16::<BigEndian>(unique_data);
+    packet.write_u16::<BigEndian>(unique_data).unwrap();
 
     let client = server.clients.get_mut(&client_id).unwrap();
-    client.stream.write(&packet);
+    match client.stream.write(&packet)
+    {
+        Ok(_) => {},
+        Err(e) => {}
+    }
 }

@@ -61,6 +61,7 @@ pub fn cpe_client_extentry(server: &mut Server, cur: &mut Cursor<&Vec<u8>>, clie
         "CustomBlocks" =>
         {
             client.customblocksupportlevel = 1;
+            client.expecting_customblock = 1;
         }
         _ =>
         {

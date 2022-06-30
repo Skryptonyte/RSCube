@@ -20,7 +20,7 @@ impl Client{
             player_name: String::from(""),
             extension_count_state: 0,
             customblocksupportlevel: 0,
-            expecting_customblock: 1,
+            expecting_customblock: 0,
             fastmap: false};
     }
 }

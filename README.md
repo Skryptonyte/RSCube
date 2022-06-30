@@ -6,13 +6,12 @@ A Minecraft Classic Server written in Rust. It is a multi-threaded server built 
 
 * Base MC Classic Protocol
 * Multi-Threading in a Multi Producer-Single Consumer architecture.
-* In Memory World Persistence
-* Initial CPE Support (Handshake and TwoWayPing)
-* World saving with /save
+* Initial CPE Support (Handshake and TwoWayPing, CustomBlocks, FastMap)
+* World saving with /save.
+* Uses MCSharp World Format
 * Some primitive commands (/kickself, /op, /tp, /save)
 # TODO
 
 * Level generator
 * Multiple maps
 * More CPE extensions
-
