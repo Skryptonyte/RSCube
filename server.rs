@@ -61,7 +61,7 @@ impl Server{
     }
     pub fn world_load(self: &mut Server)
         {
-            let file = File::open("world.lvl").unwrap();
+            let file = File::open("maps/world.lvl").unwrap();
 
             let mut header: [u8; 18] = [0; 18];
 
