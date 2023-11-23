@@ -30,7 +30,7 @@ impl Server{
     {
         return Server {server_name: String::from(server_name), 
             server_motd: String::from(server_motd), 
-            software_name: String::from("RSCube 0.0.2"),
+            software_name: String::from("RSCube 0.0.2a"),
             clients: HashMap::new(), 
             name_to_id: HashMap::new(),
             world_data: Vec::new(), world_x: 0, world_y: 0, world_z: 0, spawn_x: 0, spawn_y: 0, spawn_z: 0};
@@ -89,7 +89,7 @@ impl Server{
     pub fn world_save(self: &mut Server)
     {
         let mut file = OpenOptions::new()
-        .write(true).open("world.lvl").unwrap();
+        .write(true).open("maps/world.lvl").unwrap();
 
         let mut enc = GzEncoder::new(&mut file,Compression::default());
         
